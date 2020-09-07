@@ -983,7 +983,7 @@ class Raw:
         swsh_nmax_index = np.argmax(swsh_nmax)
         nmax = np.amax(n)
         if nmax <= max_swsh_n:
-            swsh_solve(btar, n, b, x, br, brabs, tol)
+            swsh_solve(btar, n, b, x, br, br_abs, tol)
             br_abs_argmax = np.argmax(br_abs)
             br_abs_max = br_abs[br_abs_argmax]
             if br_abs_max > tol * btar[br_abs_argmax]:
