@@ -976,18 +976,38 @@ class Raw:
              for r in swsh],
             dtype=float)
         x = np.zeros(shape=(numh, 8), dtype=int)
-        br = np.zeros(shape=(numh, 2), dtype=float)
+        br = np.zeros(shape=(numh), dtype=float)
+        br_abs = np.zeros(shape=(numh), dtype=float)
         tol = swsh_binit_feas_tol
         swsh_nmax = np.amax(n, axis=1)
         swsh_nmax_index = np.argmax(swsh_nmax)
         nmax = np.amax(n)
         if nmax <= max_swsh_n:
-            swsh_solve(btar, n, b, x, br, tol)
+            swsh_solve(btar, n, b, x, br, brabs, tol)
+            br_abs_argmax = np.argmax(br_abs)
+            br_abs_max = br_abs[br_abs_argmax]
+            if br_abs_max > tol * btar[br_abs_argmax]:
+                alert(
+                    {'data_type': 'Raw',
+                     'error_message': 'swsh binit not feasible, up to tolerance',
+                     'diagnostics':
+                         {'i': i[br_abs_argmax],
+                          'binit': btar[br_abs_argmax],
+                          'ni': n[br_abs_argmax, :].flatten().tolist(),
+                          'bi': b[br_abs_argmax, :].flatten().tolist(),
+                          'tol': tol,
+                          'x': x[br_abs_argmax, :].flatten().tolist(),
+                          'resid': br[br_abs_argmax],
+                          'abs resid': br_abs[br_abs_argmax]}})
         else:
             alert(
                 {'data_type': 'Raw',
                  'error_message': 'skipping check_switched_shunts_binit_feas due to ni exceeding maximum value of %u' % max_swsh_n,
-                 'diagnostics': {'i': i[swsh_nmax_index], 'binit': btar[swsh_nmax_index], 'ni': n[swsh_nmax_index, :].flatten().tolist(), 'bi': b[swsh_nmax_index, :].flatten().tolist()}})
+                 'diagnostics':
+                     {'i': i[swsh_nmax_index],
+                      'binit': btar[swsh_nmax_index],
+                      'ni': n[swsh_nmax_index, :].flatten().tolist(),
+                      'bi': b[swsh_nmax_index, :].flatten().tolist()}})
 
     def check_unique_branch_per_i_j_ckt(self):
 
