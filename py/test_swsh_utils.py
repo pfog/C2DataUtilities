@@ -9,10 +9,7 @@
 #
 
 import numpy as np
-#from swsh_utils import solve_py as swsh_solve
-#from swsh_utils import solve_np as swsh_solve
 from swsh_utils import solve_cy as swsh_solve
-#from swsh_utils import solve_c as swsh_solve
 import time
 
 def timeit(function):

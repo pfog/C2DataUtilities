@@ -20,6 +20,8 @@ import csv
 import os
 import sys
 import math
+import time
+import numpy as np
 import traceback
 #from io import StringIO
 try:
@@ -29,6 +31,8 @@ except ImportError:
 
 from data_json import Sup
 import inspect
+
+from swsh_utils import solve_cy as swsh_solve
 
 # init_defaults_in_unused_field = True # do this anyway - it is not too big
 read_unused_fields = True
@@ -63,11 +67,23 @@ do_check_bmin_le_binit_le_bmax = True # this is doable
 #do_combine_switched_shunt_blocks_steps = True # generally want this to be false
 do_fix_binit = True
 pg_qg_stat_mode = 1 # 0: do not scrub, 1: set pg=0 and qg=0, 2: set stat=1
+swsh_binit_feas_tol = 1e-4
+#num_swsh_to_test = 194 # 193 195 # problem with 11152/01
+max_swsh_n = 11 # maximum number of steps in each switched shunt block
 EMERGENCY_CAPACITY_FACTOR = 0.1
 EMERGENCY_MARGINAL_COST_FACTOR = 5.0
 
 ratec_ratea_2=False   #report error only once
 ratc1_rata1 = False
+
+def timeit(function):
+    def timed(*args, **kw):
+        start_time = time.time()
+        result = function(*args, **kw)
+        end_time = time.time()
+        print('function: {}, time: {}'.format(function.__name__, end_time - start_time))
+        return result
+    return timed
 
 def alert(alert_dict):
     #for line in traceback.format_stack():
@@ -933,6 +949,45 @@ class Raw:
 
         for r in self.get_switched_shunts():
             r.check()
+        self.check_switched_shunts_binit_feas()
+
+    @timeit
+    def check_switched_shunts_binit_feas(self):
+
+        swsh = [r for r in self.get_switched_shunts()]
+        #swsh = swsh[:num_swsh_to_test] # todo remove this line
+        #r0 = swsh[num_swsh_to_test - 1]
+        #print(
+        #    'swsh check i: {}, binit: {}, n: [{}, {}, {}, {}, {}, {}, {}, {}], b: [{}, {}, {}, {}, {}, {}, {}, {}]'.format(
+        #        r0.i, r0.binit,
+        #        r0.n1, r0.n2, r0.n3, r0.n4, r0.n5, r0.n6, r0.n7, r0.n8,
+        #        r0.b1, r0.b2, r0.b3, r0.b4, r0.b5, r0.b6, r0.b7, r0.b8))
+        numh = len(swsh)
+        if numh == 0:
+            return
+        i = np.array([r.i for r in swsh], dtype=int)
+        btar = np.array([r.binit for r in swsh], dtype=float)
+        n = np.array(
+            [[r.n1, r.n2, r.n3, r.n4, r.n5, r.n6, r.n7, r.n8]
+             for r in swsh],
+            dtype=int)
+        b = np.array(
+            [[r.b1, r.b2, r.b3, r.b4, r.b5, r.b6, r.b7, r.b8]
+             for r in swsh],
+            dtype=float)
+        x = np.zeros(shape=(numh, 8), dtype=int)
+        br = np.zeros(shape=(numh, 2), dtype=float)
+        tol = swsh_binit_feas_tol
+        swsh_nmax = np.amax(n, axis=1)
+        swsh_nmax_index = np.argmax(swsh_nmax)
+        nmax = np.amax(n)
+        if nmax <= max_swsh_n:
+            swsh_solve(btar, n, b, x, br, tol)
+        else:
+            alert(
+                {'data_type': 'Raw',
+                 'error_message': 'skipping check_switched_shunts_binit_feas due to ni exceeding maximum value of %u' % max_swsh_n,
+                 'diagnostics': {'i': i[swsh_nmax_index], 'binit': btar[swsh_nmax_index], 'ni': n[swsh_nmax_index, :].flatten().tolist(), 'bi': b[swsh_nmax_index, :].flatten().tolist()}})
 
     def check_unique_branch_per_i_j_ckt(self):
 
@@ -3253,6 +3308,14 @@ class SwitchedShunt:
         self.check_n6_nonneg()
         self.check_n7_nonneg()
         self.check_n8_nonneg()
+        self.check_n1_max()
+        self.check_n2_max()
+        self.check_n3_max()
+        self.check_n4_max()
+        self.check_n5_max()
+        self.check_n6_max()
+        self.check_n7_max()
+        self.check_n8_max()
 
         if do_check_bmin_le_binit_le_bmax:
             self.check_bmin_le_binit_le_bmax()
@@ -3384,6 +3447,86 @@ class SwitchedShunt:
             alert(
                 {'data_type': 'SwitchedShunt',
                  'error_message': 'fails n8 nonnegativity. Please ensure that the n8 field of every switched shunt is a nonnegative integer.',
+                 'diagnostics': {
+                     'i': self.i,
+                     'n8': self.n8}})
+
+    def check_n1_max(self):
+
+        if self.n1 > max_swsh_n:
+            alert(
+                {'data_type': 'SwitchedShunt',
+                 'error_message': 'fails n1 max value. Please ensure that the n1 field of every switched shunt is <= the maximum value of %u.' % max_swsh_n,
+                 'diagnostics': {
+                     'i': self.i,
+                     'n1': self.n1}})
+                                                
+    def check_n2_max(self):
+
+        if self.n2 > max_swsh_n:
+            alert(
+                {'data_type': 'SwitchedShunt',
+                 'error_message': 'fails n2 max value. Please ensure that the n2 field of every switched shunt is <= the maximum value of %u.' % max_swsh_n,
+                 'diagnostics': {
+                     'i': self.i,
+                     'n2': self.n2}})
+    
+    def check_n3_max(self):
+
+        if self.n3 > max_swsh_n:
+            alert(
+                {'data_type': 'SwitchedShunt',
+                 'error_message': 'fails n3 max value. Please ensure that the n3 field of every switched shunt is <= the maximum value of %u.' % max_swsh_n,
+                 'diagnostics': {
+                     'i': self.i,
+                     'n3': self.n3}})
+    
+    def check_n4_max(self):
+
+        if self.n4 > max_swsh_n:
+            alert(
+                {'data_type': 'SwitchedShunt',
+                 'error_message': 'fails n4 max value. Please ensure that the n4 field of every switched shunt is <= the maximum value of %u.' % max_swsh_n,
+                 'diagnostics': {
+                     'i': self.i,
+                     'n4': self.n4}})
+    
+    def check_n5_max(self):
+
+        if self.n5 > max_swsh_n:
+            alert(
+                {'data_type': 'SwitchedShunt',
+                 'error_message': 'fails n5 max value. Please ensure that the n5 field of every switched shunt is <= the maximum value of %u.' % max_swsh_n,
+                 'diagnostics': {
+                     'i': self.i,
+                     'n5': self.n5}})
+    
+    def check_n6_max(self):
+
+        if self.n6 > max_swsh_n:
+            alert(
+                {'data_type': 'SwitchedShunt',
+                 'error_message': 'fails n6 max value. Please ensure that the n6 field of every switched shunt is <= the maximum value of %u.' % max_swsh_n,
+                 'diagnostics': {
+                     'i': self.i,
+                     'n6': self.n6}})
+    
+    def check_n7_max(self):
+
+        if self.n7 > max_swsh_n:
+            alert(
+                {'data_type': 'SwitchedShunt',
+                 'error_message': 'fails n7 max value. Please ensure that the n7 field of every switched shunt is <= the maximum value of %u.' % max_swsh_n,
+                 'diagnostics': {
+                     'i': self.i,
+                     'n7': self.n7}})
+    
+    def check_n8_max(self):
+
+        if self.n8 > max_swsh_n:
+            alert(
+                {'data_type': 'SwitchedShunt',
+                 'error_message': 'fails n8 max value. Please ensure that the n8 field of every switched shunt is <= the maximum value of %u.' % max_swsh_n,
                  'diagnostics': {
                      'i': self.i,
                      'n8': self.n8}})

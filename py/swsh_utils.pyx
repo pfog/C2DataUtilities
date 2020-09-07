@@ -127,11 +127,11 @@ def solve_h_rec(
         return
 
     # check bounds and prune if possible
-    if br[1] <= tol * btar:
+    if br[1] <= tol * np.abs(btar):
         return
-    if br[1] <= brt[0] - bmax[at] + tol * btar:
+    if br[1] <= brt[0] - bmax[at] + tol * np.abs(btar):
         return
-    if br[1] <= bmin[at] - brt[0] + tol * btar:
+    if br[1] <= bmin[at] - brt[0] + tol * np.abs(btar):
         return
 
     cdef long at_old = at
