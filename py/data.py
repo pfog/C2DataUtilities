@@ -33,6 +33,7 @@ from data_json import Sup
 import inspect
 
 from swsh_utils import solve_cy as swsh_solve
+from xfmr_utils import compute_xfmr_position
 
 # init_defaults_in_unused_field = True # do this anyway - it is not too big
 read_unused_fields = True
@@ -70,6 +71,7 @@ pg_qg_stat_mode = 1 # 0: do not scrub, 1: set pg=0 and qg=0, 2: set stat=1
 swsh_binit_feas_tol = 1e-4
 #num_swsh_to_test = 194 # 193 195 # problem with 11152/01
 max_swsh_n = 11 # maximum number of steps in each switched shunt block
+xfmr_tau_theta_init_tol = 1e-4
 EMERGENCY_CAPACITY_FACTOR = 0.1
 EMERGENCY_MARGINAL_COST_FACTOR = 5.0
 
@@ -986,7 +988,7 @@ class Raw:
             swsh_solve(btar, n, b, x, br, br_abs, tol)
             br_abs_argmax = np.argmax(br_abs)
             br_abs_max = br_abs[br_abs_argmax]
-            if br_abs_max > tol * btar[br_abs_argmax]:
+            if br_abs_max > tol * abs(btar[br_abs_argmax]):
                 alert(
                     {'data_type': 'Raw',
                      'error_message': 'swsh binit not feasible, up to tolerance',
@@ -2699,6 +2701,7 @@ class Transformer:
 
         check_two_char_id_str(self.ckt)
         self.check_ckt_len_1_or_2()
+        self.check_cod1_013()
         self.check_r12_x12_nonzero()
         if do_check_rate_pos:
             self.check_rata1_pos()
@@ -2714,10 +2717,36 @@ class Transformer:
         # need to check i, j in buses
         self.check_tau_theta_init_feas()
 
+    def check_cod1_013(self):
+
+        if not self.cod1 in [0, 1, 3]:
+            alert(
+                {'data_type': 'Transformer',
+                 'error message': 'COD1 not in [0, 1, 3].',
+                 'diagnostics': {
+                     'i': self.i,
+                     'j': self.j,
+                     'k': self.k,
+                     'ckt': self.k,
+                     'cod1': self.cod1}})
+
+
     def check_tau_theta_init_feas(self):
 
-        #todo
-        pass
+        x = compute_xfmr_position(self)
+        oper_val = x[1]
+        resid = x[3]
+        if abs(resid) > xfmr_tau_theta_init_tol * abs(oper_val):
+            alert(
+                {'data_type': 'Transformer',
+                 'error message': 'tau/theta init is infeasible.',
+                 'diagnostics': {
+                     'i': self.i,
+                     'j': self.j,
+                     'k': self.k,
+                     'ckt': self.k,
+                     'cod1': self.cod1,
+                     'stat': self.stat}})
         
     def check_k_0(self):
 

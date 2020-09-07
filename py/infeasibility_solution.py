@@ -26,6 +26,7 @@ except ImportError:
 # GOComp modules - this should be visible on the GOComp evaluation system
 import data
 from swsh_utils import solve_cy as swsh_solve
+from xfmr_utils import compute_xfmr_position
 
 swsh_binit_tol = 1e-4
 
@@ -39,25 +40,6 @@ swsh_binit_tol = 1e-4
 #   maintain sol1/sol2 in numpy arrays, update as needed, write to string, compile strings and write to file
 # project tap onto bounds/steps - done, need to document this in the formulation
 # project swsh b onto bounds/steps
-
-def compute_xfmr_position(r):
-    if r.cod1 == 0:
-        position = 0
-    else:
-        mid_val = 0.5 * (r.rma1 + r.rmi1)
-        step_size = (r.rma1 - r.rmi1) / (r.ntp1 - 1.0)
-        max_position = int(round(0.5 * (r.ntp1 - 1.0)))
-        if r.cod1 == 1:
-            oper_val = r.windv1 / r.windv2
-        else:
-            oper_val = r.ang1
-        position = round((oper_val - mid_val) / step_size)
-        if position > max_position:
-            position = max_position
-        elif position < -max_position:
-            position = -max_position
-    #position = 0
-    return position
 
 # def compute_swsh_steps(r):
 #     # todo
@@ -229,7 +211,7 @@ class Solver():
         self.xfmr_sol['idest'] = self.xfmr_j
         self.xfmr_sol['id'] = self.xfmr_ckt
         self.xfmr_sol['x'] = self.xfmr_stat
-        self.xfmr_sol['xst'] = np.array([compute_xfmr_position(r) for r in self.xfmr], dtype=int) # todo
+        self.xfmr_sol['xst'] = np.array([compute_xfmr_position(r)[0] for r in self.xfmr], dtype=int) # todo - numpy version
 
     def construct_swsh_arrays(self):
 
