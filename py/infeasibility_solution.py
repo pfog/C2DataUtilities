@@ -25,6 +25,9 @@ except ImportError:
 
 # GOComp modules - this should be visible on the GOComp evaluation system
 import data
+from swsh_utils import solve_cy as swsh_solve
+
+swsh_binit_tol = 1e-4
 
 # modules for this code
 #sys.path.append(os.path.normpath('.')) # better way to make this visible?
@@ -56,10 +59,10 @@ def compute_xfmr_position(r):
     #position = 0
     return position
 
-def compute_swsh_steps(r):
-    # todo
-    steps = r.swsh_susc_count * [0]
-    return steps
+# def compute_swsh_steps(r):
+#     # todo
+#     steps = r.swsh_susc_count * [0]
+#     return steps
 
 def compute_swsh_xst(h_b0, ha_n, ha_b):
 
@@ -68,8 +71,12 @@ def compute_swsh_xst(h_b0, ha_n, ha_b):
     assert(ha_n.shape[0] == ha_b.shape[0])
     assert(ha_n.shape[1] == ha_b.shape[1])
     assert(h_b0.shape[0] == num_swsh)
-    out = np.zeros(shape=(num_swsh, num_block), dtype=int)
-    return out
+    ha_x = np.zeros(shape=(num_swsh, num_block), dtype=int)
+    h_r = np.zeros(shape=(num_swsh,), dtype=float)
+    h_r_abs = np.zeros(shape=(num_swsh,), dtype=float)
+    tol = swsh_binit_tol
+    swsh_solve(h_b0, ha_n, ha_b, ha_x, h_r, h_r_abs, tol)
+    return ha_x
 
 def csv2string(data):
     si = StringIO.StringIO()
@@ -233,18 +240,18 @@ class Solver():
         self.swsh_n = np.array([[r.n1, r.n2, r.n3, r.n4, r.n5, r.n6, r.n7, r.n8] for r in self.swsh], dtype=int)
         self.swsh_b = np.array([[r.b1, r.b2, r.b3, r.b4, r.b5, r.b6, r.b7, r.b8] for r in self.swsh])
         self.swsh_num_block = np.array([r.swsh_susc_count for r in self.swsh], dtype=int)
-        swsh_xst = compute_swsh_xst(self.swsh_binit, self.swsh_n, self.swsh_b) # todo
+        self.swsh_xst = compute_swsh_xst(self.swsh_binit, self.swsh_n, self.swsh_b) # todo
         #self.swsh_sol = np.zeros(shape=(self.num_swsh,), dtype=[('i', int_type_str), ('xst1', int_type_str), ('xst2', int_type_str), ('xst3', int_type_str), ('xst4', int_type_str), ('xst5', int_type_str), ('xst6', int_type_str), ('xst7', int_type_str), ('xst8', int_type_str)])
         self.swsh_sol = pd.DataFrame(columns=['i', 'xst1', 'xst2', 'xst3', 'xst4', 'xst5', 'xst6', 'xst7', 'xst8'])
         self.swsh_sol['i'] = self.swsh_i
-        self.swsh_sol['xst1'] = swsh_xst[:,0]
-        self.swsh_sol['xst2'] = swsh_xst[:,1]
-        self.swsh_sol['xst3'] = swsh_xst[:,2]
-        self.swsh_sol['xst4'] = swsh_xst[:,3]
-        self.swsh_sol['xst5'] = swsh_xst[:,4]
-        self.swsh_sol['xst6'] = swsh_xst[:,5]
-        self.swsh_sol['xst7'] = swsh_xst[:,6]
-        self.swsh_sol['xst8'] = swsh_xst[:,7]
+        self.swsh_sol['xst1'] = self.swsh_xst[:,0]
+        self.swsh_sol['xst2'] = self.swsh_xst[:,1]
+        self.swsh_sol['xst3'] = self.swsh_xst[:,2]
+        self.swsh_sol['xst4'] = self.swsh_xst[:,3]
+        self.swsh_sol['xst5'] = self.swsh_xst[:,4]
+        self.swsh_sol['xst6'] = self.swsh_xst[:,5]
+        self.swsh_sol['xst7'] = self.swsh_xst[:,6]
+        self.swsh_sol['xst8'] = self.swsh_xst[:,7]
         # todo what to do about ragged edge? mask?
 
     def construct_sol1_bus(self):
@@ -310,11 +317,16 @@ class Solver():
                 compute_xfmr_position(r)] # xst
             for r in self.data.raw.transformers.values()}
         self.sol1['switched shunts'] = {
-            r.i: (
-                [r.i] + # i
-                compute_swsh_steps(r)) # xst1, xst2 ... swsh_susc_count
-            for r in self.data.raw.switched_shunts.values()
-            if r.stat == 1}
+            self.swsh_i[i]: (
+                [self.swsh_i[i]] + #i
+                self.swsh_xst[i, 0:self.swsh[i].swsh_susc_count].flatten().tolist()) # xst1, xst2 ... swsh_susc_count
+            for i in range(self.num_swsh)}
+        # self.sol1['switched shunts'] = {
+        #     r.i: (
+        #         [r.i] + # i
+        #         compute_swsh_steps(r)) # xst1, xst2 ... swsh_susc_count
+        #     for r in self.data.raw.switched_shunts.values()
+        #     if r.stat == 1}
         end_time = time.time()
         print('construct_sol1 time: %f' % (end_time - start_time))
 
@@ -377,6 +389,7 @@ class Solver():
     def write_sol1(self, sol_dir, saved_sol_file_name=None):
 
         start_time = time.time()
+        self.construct_arrays()
         self.construct_sol1_bus()
         #self.construct_sol2_bus()
         self.construct_sol1()
@@ -390,10 +403,12 @@ class Solver():
     def write_sol2(self, sol_dir, saved_sol_file_name=None):
 
         start_time = time.time()
+        #self.construct_arrays()
         self.construct_sol2_bus()
         if saved_sol_file_name is not None:
             self.sol1 = self.read_sol_bin(saved_sol_file_name)
         else:
+            self.construct_arrays()
             self.construct_sol1()
         for k in self.data.con.contingencies.values():
             self.construct_sol2(k)

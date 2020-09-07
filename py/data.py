@@ -2712,6 +2712,12 @@ class Transformer:
             self.check_i_lt_j()
         self.check_i_ne_j()
         # need to check i, j in buses
+        self.check_tau_theta_init_feas()
+
+    def check_tau_theta_init_feas(self):
+
+        #todo
+        pass
         
     def check_k_0(self):
 
