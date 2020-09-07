@@ -11,7 +11,7 @@
 import numpy as np
 
 # import this from python
-def solve_cy(btar, n, b, x, br, tol):
+def solve_cy(btar, n, b, x, br, br_abs, tol):
 
     # check conditions
     numh = n.shape[0]
@@ -24,7 +24,7 @@ def solve_cy(btar, n, b, x, br, tol):
     assert x.shape[0] == numh
     assert x.shape[1] == numa
     assert br.shape[0] == numh
-    assert br.shape[1] == 2
+    assert br_abs.shape[0] == numh
     assert tol >= 0.0
 
     # preprocessing
@@ -42,13 +42,14 @@ def solve_cy(btar, n, b, x, br, tol):
     bmin = np.take_along_axis(bmin, indices, axis=1)
     bmax = np.cumsum(bmax[:,::-1], axis=1)[:,::-1]
     bmin = np.cumsum(bmin[:,::-1], axis=1)[:,::-1]
+    br_concat = np.column_stack((br, br_abs)) # todo - add a dimension to br, br_abs, and pass them through the cython functions
 
     # make memviews
     cdef double[:] btar_v = btar
     cdef long[:,:] n_v = n_sorted
     cdef double[:,:] b_v = b_sorted
     cdef long[:,:] x_v = x_sorted
-    cdef double[:,:] br_v = br
+    cdef double[:,:] br_v = br_concat
     cdef double[:,:] bmax_v = bmax
     cdef double[:,:] bmin_v = bmin
 
@@ -57,6 +58,8 @@ def solve_cy(btar, n, b, x, br, tol):
 
     # put the solution back in the original order
     np.put_along_axis(x, indices, x_v, axis=1)
+    br[:] = br_v[:,0]
+    br_abs[:] = br_v[:,1]
 
 # memviews version of solve
 def solve_v(
@@ -113,6 +116,8 @@ def solve_h_rec(
     # brt has 2 entries
     # brt[0] = residual
     # brt[1] = absolute value of residual
+
+    # todo can anything be improved by earlier declaration of work variables?
 
     cdef Py_ssize_t i
     

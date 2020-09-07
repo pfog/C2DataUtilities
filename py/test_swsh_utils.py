@@ -22,34 +22,35 @@ def timeit(function):
     return timed
 
 @timeit
-def solve(btar, n, b, x, br, tol):
-    swsh_solve(btar, n, b, x, br, tol)
+def solve(btar, n, b, x, br, br_abs, tol):
+    swsh_solve(btar, n, b, x, br, br_abs, tol)
 
 @timeit
 def demo1(nh, na, ns, btar, n, b, tol):
 
     x = np.zeros(shape=(nh,na), dtype=int) # x[h,a] is the solution - number of steps activated in block a of switched shunt h
-    br = np.zeros(shape=(nh,2), dtype=float) # column 0 is the residual, column 1 is the absolute value of resid, row h for switched shunt h
+    br = np.zeros(shape=(nh), dtype=float) # residual, row h for switched shunt h
+    br_abs = np.zeros(shape=(nh), dtype=float) #absolute value of resid, row h for switched shunt h
 
     print("nh: {}, na: {}, ns: {}".format(nh, na, ns))
     print('btar: {}'.format(btar))
     print('n: {}'.format(n))
     print('b: {}'.format(b))
     print('tol: {}'.format(tol))
-    solve(btar, n, b, x, br, tol)
+    solve(btar, n, b, x, br, br_abs, tol)
     print('x: {}'.format(x))
-    print('br: {}'.format(br[:,0]))
-    print('br abs: {}'.format(br[:,1]))
-    print('br abs sorted: {}'.format(np.sort(br[:,1])))
-    br_diff = np.amax(np.absolute(br[:,0] - (btar - np.sum(np.multiply(b, x), axis=1).flatten())))
+    print('br: {}'.format(br))
+    print('br abs: {}'.format(br_abs))
+    print('br abs sorted: {}'.format(np.sort(br_abs)))
+    br_diff = np.amax(np.absolute(br - (btar - np.sum(np.multiply(b, x), axis=1).flatten())))
     print('br diff: {}'.format(br_diff))
     print('tol: {}'.format(tol**0.5))
-    solve(btar, n, b, x, br, tol**0.5)
+    solve(btar, n, b, x, br, br_abs, tol**0.5)
     print('x: {}'.format(x))
-    print('br: {}'.format(br[:,0]))
-    print('br abs: {}'.format(br[:,1]))
-    print('br abs sorted: {}'.format(np.sort(br[:,1])))
-    br_diff = np.amax(np.absolute(br[:,0] - (btar - np.sum(np.multiply(b, x), axis=1).flatten())))
+    print('br: {}'.format(br))
+    print('br abs: {}'.format(br_abs))
+    print('br abs sorted: {}'.format(np.sort(br_abs)))
+    br_diff = np.amax(np.absolute(br - (btar - np.sum(np.multiply(b, x), axis=1).flatten())))
     print('br diff: {}'.format(br_diff))
 
 @timeit
