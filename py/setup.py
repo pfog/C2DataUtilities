@@ -13,4 +13,4 @@ from Cython.Build import cythonize
 
 setup(
     ext_modules=cythonize(
-        ["swsh_utils.pyx"]))
+        ["swsh_utils_cy.pyx"]))
